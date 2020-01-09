@@ -25,34 +25,10 @@ public class Main {
 		}
 	}
 	
-	public static class Ballot {
-		private String remainingBallot;
-		
-		public Ballot(String ballot){
-			this.remainingBallot = ballot;
-		}
-		
-		public int parseNext(){
-			int to = 0;
-			if(remainingBallot.length() == 1 || remainingBallot.charAt(1) == ' '){
-				to = 1;
-			} else {
-				to = 2;
-			}
-			
-			int vote = Integer.parseInt(remainingBallot.substring(0, to));
-			if(remainingBallot.length() > to + 1){
-				remainingBallot = remainingBallot.substring(to + 1); // only store remaining votes
-				assert remainingBallot.charAt(0) != ' ';
-			} else {
-				remainingBallot = null;
-			}
-			return vote - 1; // the topmost vote is returned as int
-		}
-	}
+
 	
     public static void main(String[] args) {
-		//long millis = System.nanoTime();
+		long millis = System.nanoTime();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
             while (reader.ready()) {
 				int testcaseCount = Integer.parseInt(reader.readLine().trim());
@@ -67,9 +43,14 @@ public class Main {
 					
 					String currentLine = reader.readLine();
 					// linked list because we always need to iterate (no random access)
-					ArrayList<Ballot> ballots = new ArrayList<>();
+					ArrayList<ListItem> ballots = new ArrayList<>();
 					while(currentLine != null && !currentLine.equals("")){
-						ballots.add(new Ballot(currentLine.trim()));
+						String[] currBallStr = currentLine.trim().split(" ", candidateCount);
+						ListItem vote = null;
+						for(int j = currBallStr.length - 1; j >= 0; --j){
+							vote = new ListItem(Integer.parseInt(currBallStr[j]) - 1, vote);
+						}
+						ballots.add(vote);
 						currentLine = reader.readLine();
 					}
 					executeVoting(candidates, ballots);
@@ -91,7 +72,7 @@ public class Main {
 	public static int s_majorityThreshold;
 	public static String[] s_candidates;
 	
-	public static void executeVoting(String[] candidates, List<Ballot> ballots){
+	public static void executeVoting(String[] candidates, List<ListItem> ballots){
 		// the number of votes a candidate have to reach in order to be elected
 		s_majorityThreshold = (int) Math.ceil(ballots.size() / 2.0);
 		s_eliminatedCount = 0;
@@ -130,12 +111,12 @@ public class Main {
 	 * 
 	 * @return the amount of winner (1 or 0)
 	 */
-	public static int initialVoteCount(int[] candidateVotes, ListItem[] candidateVoters, List<Ballot> ballots){
+	public static int initialVoteCount(int[] candidateVotes, ListItem[] candidateVoters, List<ListItem> ballots){
 		int maxCandidate = 0; // the candidate with the most votes (so far)
 		
 		// loop through all ballots and count for the highest ranked candidate
 		for(int i = 0; i < ballots.size(); ++i){
-			int preferredVote = ballots.get(i).parseNext(); // get highest ranked vote
+			int preferredVote = ballots.get(i).value; // get highest ranked vote
 			candidateVotes[preferredVote] = candidateVotes[preferredVote] + 1; // increment count for candidate
 			
 			candidateVoters[preferredVote] = new ListItem(i, candidateVoters[preferredVote]); // keep reference to ballot
@@ -154,11 +135,12 @@ public class Main {
 			return 0;
 		}
 	}
+
 	
 	/**
 	 *  returns the count of winners (or 0 if not yet a winner)
 	 */
-	public static int evaluateVoteRound(int[] candidateVotes, ListItem[] candidateVoters, List<Ballot> ballots){
+	public static int evaluateVoteRound(int[] candidateVotes, ListItem[] candidateVoters, List<ListItem> ballots){
 		ListItem toEliminate = null; // linked list of candidates eliminated in this round
 		int eliminateCount = 0; // track the amount of eliminated candidates (used for determining the tied candidates in case of a tie)
 		
@@ -213,15 +195,16 @@ public class Main {
 			 * after this block, ballots is "clean" again, that means the first vote on each ballot is still a valid candidate
 			 */
 			while(currentBallotRef != null){ // loop through all ballots that voted for this candidate
-				Ballot currentBallot = ballots.get(currentBallotRef.value); // get ballot which voted for the eliminated candidate 
-				int nextPreferredVote;
-				do { // find next highest ranked candidate that was not eliminated yet
-					nextPreferredVote = currentBallot.parseNext();
-				} while(candidateVoters[nextPreferredVote] == null);
-				candidateVotes[nextPreferredVote] += 1; // increment vote for the new highest ranked candidate for that ballot
+				ListItem currentBallot = ballots.get(currentBallotRef.value); // get ballot which voted for the eliminated candidate 
 				
-				candidateVoters[nextPreferredVote] = new ListItem(currentBallotRef.value, candidateVoters[nextPreferredVote]);
-
+				do { // find next highest ranked candidate that was not eliminated yet
+					currentBallot = currentBallot.next;
+					assert currentBallot != null; 
+				} while(candidateVoters[currentBallot.value] == null);
+				candidateVotes[currentBallot.value] += 1; // increment vote for the new highest ranked candidate for that ballot
+				
+				candidateVoters[currentBallot.value] = new ListItem(currentBallotRef.value, candidateVoters[currentBallot.value]);
+				ballots.set(currentBallotRef.value, currentBallot); // set the new ballot in the ballots list
 				currentBallotRef = currentBallotRef.next; // go to next ballot ref
 			}
 			currentElCan = currentElCan.next; // go to next eliminated candidate
