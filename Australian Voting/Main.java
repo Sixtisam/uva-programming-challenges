@@ -8,24 +8,41 @@ import java.util.LinkedList;
 
 /**
  * 10142 - Australian Voting
- * @date 05.01.2020
+ * First, all candidates and ballots are read. Ballots are lazily readed, that means 
+ * I don't parse the whole ballot string, but only the leftmost "vote" whenever a vote must be counted.
+ * In 'initialVoteCount' all highest ranked votes are counted and for each candidate, the voters are memorized.
+ * After this initial count, if a winner is determined the election is finished and the winner written to the OUTPUT buffer
+ * If not yet a winner is elected, in 'evaluateVoteRound' the first task is to find all eliminated candidates.
+ * If  now all candidates are eliminated, this means that the election resulted in a tie. In this case, the 'winners' are those canddiates eliminated
+ *     right before this check. Those are written to the OUTPUT buffer
+ * Else via the candidateVoters, each ballot that vote for the eliminated candidate(s) is further parsed until a vote is found for a candidate still available.
+ * This approach therefore does not need to recount all ballots after the first round and therefore saves much time.
+ * 
+ *
+ * 
+ * @date 10.01.2020
  * @author Samuel Keusch
  */
 public class Main {
 	// collect all output in a StringBuilder (its faster than System.out)
 	public static final StringBuilder OUTPUT = new StringBuilder();
 	
+	// linked list
 	public static class ListItem {
-		public final ListItem next;
+		public ListItem next;
 		public final int value;
 		
 		public ListItem(int value, ListItem next){
-			this.next = next; 
+			this.next = next;
 			this.value = value;
 		}
 	}
 	
+	/**
+	 *
+	 */
 	public static class Ballot {
+		// the remaining ballot string. For efficiency, the ballot is lazily read
 		private String remainingBallot;
 		
 		public Ballot(String ballot){
@@ -69,7 +86,7 @@ public class Main {
 					// linked list because we always need to iterate (no random access)
 					ArrayList<Ballot> ballots = new ArrayList<>();
 					while(currentLine != null && !currentLine.equals("")){
-						ballots.add(new Ballot(currentLine.trim()));
+						ballots.add(new Ballot(currentLine.trim())); // ballots are lazily evaluated
 						currentLine = reader.readLine();
 					}
 					executeVoting(candidates, ballots);
@@ -86,51 +103,39 @@ public class Main {
     }
 			
 	public static int s_eliminatedCount ; // the amount of eliminated candidates
-	public static ListItem s_eliminatedCandidates; // the candidates currently eliminated
-	public static int s_singleWinner; // the index of the winner candidate in case of a single winner
-	public static int s_majorityThreshold;
-	public static String[] s_candidates;
+	public static int s_majorityThreshold; // thresold for winning the election
 	
 	public static void executeVoting(String[] candidates, List<Ballot> ballots){
 		// the number of votes a candidate have to reach in order to be elected
 		s_majorityThreshold = (int) Math.ceil(ballots.size() / 2.0);
 		s_eliminatedCount = 0;
-		s_eliminatedCandidates = null;
-		s_singleWinner = -1;
-		s_candidates = candidates;
 		
 		int[] candidateVotes = new int[candidates.length]; // stores the count of votes for each candidate
 		ListItem[] candidateVoters = new ListItem[candidates.length]; // store the ballots that voted for each candidate
-		int winnerCount = initialVoteCount(candidateVotes, candidateVoters, ballots);
+		
+		int[] winners = initialVoteCount(candidateVotes, candidateVoters, ballots);
 		int round = 1;
-		while(winnerCount == 0){
+		while(winners == null){
 			//System.err.println("Round " + round++ + " ----------------");
-			winnerCount = evaluateVoteRound(candidateVotes, candidateVoters, ballots);
+			winners = evaluateVoteRound(candidateVotes, candidateVoters, ballots);
 			//System.err.println("---------------------------------");
 		}
 		
-		if(winnerCount == 1){
-			OUTPUT.append(candidates[s_singleWinner]);
+
+		// print all winners
+		for(int i = 0; i < winners.length; i++){
+			OUTPUT.append(candidates[winners[i]]);
 			OUTPUT.append(System.lineSeparator());
-		} else {
-			printWinners(s_eliminatedCandidates, winnerCount - 1);
 		}
 	}
-	
-	public static void printWinners(ListItem winner, int winnerCount){
-		if(winnerCount > 0){
-			printWinners(winner.next, winnerCount - 1);
-		}
-		OUTPUT.append(s_candidates[winner.value]);
-		OUTPUT.append(System.lineSeparator());
-	}
+
 	
 	/**
 	 * the initial count of all votes
 	 * 
 	 * @return the amount of winner (1 or 0)
 	 */
-	public static int initialVoteCount(int[] candidateVotes, ListItem[] candidateVoters, List<Ballot> ballots){
+	public static int[] initialVoteCount(int[] candidateVotes, ListItem[] candidateVoters, List<Ballot> ballots){
 		int maxCandidate = 0; // the candidate with the most votes (so far)
 		
 		// loop through all ballots and count for the highest ranked candidate
@@ -148,18 +153,16 @@ public class Main {
 		// because only 1 candidate can have > 50% the case of a tied election falls into the else.
 		// the tie election is the handled in the evaluateVoteRound function
 		if(candidateVotes[maxCandidate] > s_majorityThreshold){
-			s_singleWinner = maxCandidate;
-			return 1;
+			return new int[]{maxCandidate};
 		} else {
-			return 0;
+			return null;
 		}
 	}
 	
 	/**
 	 *  returns the count of winners (or 0 if not yet a winner)
 	 */
-	public static int evaluateVoteRound(int[] candidateVotes, ListItem[] candidateVoters, List<Ballot> ballots){
-		ListItem toEliminate = null; // linked list of candidates eliminated in this round
+	public static int[] evaluateVoteRound(int[] candidateVotes, ListItem[] candidateVoters, List<Ballot> ballots){
 		int eliminateCount = 0; // track the amount of eliminated candidates (used for determining the tied candidates in case of a tie)
 		
 		// find all candidates that need to be eliminated this round
@@ -167,10 +170,8 @@ public class Main {
 		for(int i = 0; i < candidateVotes.length; ++i){
 			if(candidateVotes[i] != -1){ // -1 means the candidate is already eliminated
 				if(candidateVotes[i] == min){
-					toEliminate = new ListItem(i, toEliminate);
 					eliminateCount++;
 				} else if(candidateVotes[i] < min){
-					toEliminate = new ListItem(i, s_eliminatedCandidates);
 					eliminateCount = 1;
 					min = candidateVotes[i];
 				}
@@ -186,54 +187,59 @@ public class Main {
 		}/**/
 		
 		// merge NEWLY eliminated candidates with already eliminated candidates
-		s_eliminatedCandidates = toEliminate;
 		s_eliminatedCount += eliminateCount;
 		
-		// in case all candidates got now eliminated, that means those eliminated last were all tied.
-		if(candidateVotes.length == s_eliminatedCount){
-			if(eliminateCount == 1){
-				s_singleWinner = toEliminate.value;
+		// collect candidates to eliminate
+		int count = 0;
+		int [] toEliminate = new int[eliminateCount];
+		for(int i = 0; i < candidateVotes.length && count < eliminateCount; ++i){ // search winners
+			if(candidateVotes[i] == min){
+				toEliminate[count++] = i;
 			}
-			return eliminateCount; // amount of candidates tied (candidates are in the s_eliminatedCandidates)
 		}
 		
-
+		if(candidateVotes.length == s_eliminatedCount){
+			return toEliminate; // return winners in case of a tie election
+		}
 		
 		
-		ListItem currentElCan = s_eliminatedCandidates; // loop through all NEWLY eliminated candidates
-		for(int i = 0; i < eliminateCount; i++){
-			candidateVotes[currentElCan.value] = -1; // set the votes for the eliminated candidate to 0
+		for(int i = 0; i < toEliminate.length; ++i){ // loop through each candidate which has to be eliminated
+			int candidate = toEliminate[i];
+			candidateVotes[candidate] = -1; // set the votes for the eliminated candidate to 0
 			
-			ListItem currentBallotRef = candidateVoters[currentElCan.value]; // get the ballot ref (of the first ballot that voted for the eliminated candidate)
-			candidateVoters[currentElCan.value] = null; // reset candidateVoters to use as lookup below
+			ListItem currentBallotRef = candidateVoters[candidate]; // get the ballot ref (of the first ballot that voted for the eliminated candidate)
 			
 			/**
 			 * Loop through all ballots, that voted for the eliminated candidate.
 			 * For each ballot, the next not-yet eliminated candidate is "searched"
-			 * after this block, ballots is "clean" again, that means the first vote on each ballot is still a valid candidate
+			 * after this block, all ballot Are "clean" again, that means the first vote on each ballot is still a valid candidate
 			 */
 			while(currentBallotRef != null){ // loop through all ballots that voted for this candidate
+				candidateVoters[candidate] = currentBallotRef.next; // remove current candidate from candidate voters
+				
 				Ballot currentBallot = ballots.get(currentBallotRef.value); // get ballot which voted for the eliminated candidate 
+				
 				int nextPreferredVote;
 				do { // find next highest ranked candidate that was not eliminated yet
 					nextPreferredVote = currentBallot.parseNext();
 				} while(candidateVoters[nextPreferredVote] == null);
 				candidateVotes[nextPreferredVote] += 1; // increment vote for the new highest ranked candidate for that ballot
 				
-				candidateVoters[nextPreferredVote] = new ListItem(currentBallotRef.value, candidateVoters[nextPreferredVote]);
+				currentBallotRef.next = candidateVoters[nextPreferredVote]; // (1/2)prepend ballot ref to new candidate voters list
+				candidateVoters[nextPreferredVote] = currentBallotRef; // (2/2)
 
-				currentBallotRef = currentBallotRef.next; // go to next ballot ref
+				currentBallotRef = candidateVoters[candidate]; // go to next ballot ref
 			}
-			currentElCan = currentElCan.next; // go to next eliminated candidate
+			assert candidateVoters[candidate] == null; // should be null because we iterate until the end
 		}
 		
+		// check if now a candidate has won
 		for(int i = 0; i < candidateVotes.length; ++i){
 			if(candidateVotes[i] > s_majorityThreshold){
-				s_singleWinner = i;
-				return 1;
+				return new int[]{i};
 			}
 		}
 		
-		return 0; // no candidate is winner so far
+		return null; // no candidate is winner so far
 	}
 }
