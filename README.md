@@ -1,5 +1,5 @@
-# uva-programming-challenges
+# Programming Challenges
 
-In the University of Applied Sciences Northwestern Switzerland, I attended several courses which included solving algorithmic problems from the [onlinejudge.org](https://onlinejudge.org)
+This repository contains several solutions to programming challenges.
 
-This repository contains my solutions to that problems.
+Each problem has its own folder with the problem description, the solution code and some example input.
