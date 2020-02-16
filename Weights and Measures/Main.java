@@ -7,9 +7,11 @@ import java.util.ArrayList;
 
 /**
  * 10154 - Weights and Measures
- * My solutions tries to start with the least strongest turtles.
+ * My solutions tries to start with the weakest turtle, because obviously, 
+ * the weakest cannot lift a heavier tower than a stronger turtle.
  * At first, the weakest turtle will form a tower of size 1.
- * Then, for the next turtle, this new turtle is being placed on
+ * Then, the next turtle tries to "lift" that tower of size 1.
+ * Third, the 3. weakest turtle tries to "lift" all existing towers, thats means also the tower of size 1.
  * any existing towers (including tower size 0). 
  * A turtle tower will replace an existing turtle tower whenever the new tower is lighter 
  * than the existing one.
@@ -24,6 +26,8 @@ public class Main {
 	
     public static void main(String[] args) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
+			
+			// read in all turtles
 			ArrayList<int[]> turtles = new ArrayList<>(1000);
 			while (reader.ready()) {
 				String[] line = reader.readLine().trim().split(" ", 2);
@@ -37,16 +41,19 @@ public class Main {
 				return Integer.compare(a[1], b[1]);
 			});
 			
-			int[] dp = new int[turtles.size() + 1]; // extra place for index 0
+			// the index represents the height of the tower
+			// array needs extra index for tower size 0 (base case)
+			int[] dp = new int[turtles.size() + 1];
 			Arrays.fill(dp, Integer.MAX_VALUE); // fill array with max weight
 			dp[0] = 0; // a turtle tower with height 0 is 0 heavy
 			
 			// starting with the least strongest turtle
 			for(int i = 0; i < turtles.size(); i++){
 				int[] turtle = turtles.get(i);
-				// for each tower, start with highest tower first, so we dont duplicate the current turtle
-				for(int j = i + 1; j >= 0; j--) { // because we are at the i-th turtle, the biggest tower could be at maximum i high.
-					// add the turtle to all existing towers and see, if the newly formed tower is lighter than that (probably) existing tower.
+				// for each tower (highest tower first)
+				for(int j = i + 1; j >= 0; j--) { // because we are at the i-th turtle, the biggest tower could be at maximum i+1 high.
+					// try to put the current turtle below the tower, if this works and resulting tower is lighter than (probably) already existing tower j+1
+					// store that the tower, because its a better solution
 					if(dp[j] <= turtle[2] && dp[j + 1] > dp[j] + turtle[0]){
 						dp[j + 1] = dp[j] + turtle[0];
 					}

@@ -38,6 +38,7 @@ public class Main {
 
             }
 			System.out.print(OUTPUT);
+			System.exit(0);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
