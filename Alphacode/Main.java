@@ -61,7 +61,7 @@ public class Main {
 				// a 0 does not increase the amount of combinations
 				dp[i] = 0;
 			// if current and next char form a valid encoded pair
-			} else if(code.charAt(curr) <= '2' && code.charAt(next) <= '6'){
+			} else if(code.charAt(curr) == '1' || (code.charAt(curr) == '2' && code.charAt(next) <= '6')){
 				// dp[i-2] for the case curr and next form a pair
 				// dp[i-1] for the case curr is interpreted alone
 				dp[i] = dp[i-2] + dp[i-1];
